@@ -1,2 +1,3 @@
 include versioneer.py
 include q2_jk/_version.py
+recursive-include q2_jk/templates *

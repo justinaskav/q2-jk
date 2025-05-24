@@ -263,7 +263,8 @@ def visualize_taxonomy_comparison(output_dir: str,
     class_pivot_reset['LevelOrder'] = class_pivot_reset['Level'].map(
         lambda x: TAXONOMIC_ORDER.index(x) if x in TAXONOMIC_ORDER else 999
     )
-    class_pivot_reset = class_pivot_reset.sort_values('LevelOrder').drop(columns=['LevelOrder'])
+    class_pivot_reset = class_pivot_reset.sort_values('LevelOrder')
+    class_pivot_reset = class_pivot_reset.drop(columns=['LevelOrder'])
     class_pivot = class_pivot_reset.set_index('Level')
     
     # Format column names
