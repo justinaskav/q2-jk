@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>Taxonomy Comparison Report</h1>
+    <p class="lead">Comparing taxonomic assignments between <strong>{{ tax1_name }}</strong> and <strong>{{ tax2_name }}</strong></p>
+    
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2>Feature Counts</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text">This table shows the number of features in each taxonomy and how many are unique to each method.</p>
+            {{ feature_counts_html|safe }}
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2>Classification Rates</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text">This table shows the percentage of classified taxa at each taxonomic level. Empty values and "rank prefixes" (e.g., "g__") are counted as unclassified.</p>
+            {{ classification_stats_html|safe }}
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2>Summary Statistics</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text">This table shows overall agreement between the two taxonomies at each level. 
+            The "Same" column indicates how many features have identical assignments, while "Different" shows how many assignments disagree.</p>
+            {{ summary_stats_html|safe }}
+        </div>
+    </div>
+    
+    {% for level in levels %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h2>{{ level }} Level Comparison</h2>
+            </div>
+            <div class="card-body">
+                {% if level in common_diffs_html %}
+                    <h3>Most Common Differences</h3>
+                    <p class="card-text">This table shows the most common disagreements between the two taxonomic methods at this level.</p>
+                    {{ common_diffs_html[level]|safe }}
+                {% endif %}
+                
+                {% if "confusion_" + level + ".png" in viz_files %}
+                    <h3 class="mt-4">Confusion Matrix</h3>
+                    <p class="card-text">This matrix shows how taxonomic assignments correspond between methods.
+                    Each cell shows the count of features assigned to the corresponding taxa.
+                    The diagonal represents matching assignments, while off-diagonal values show discrepancies.</p>
+                    <div class="text-center">
+                        <img src="confusion_{{ level }}.png" alt="Confusion matrix for {{ level }}" class="img-fluid" style="max-width: 100%;">
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<style>
+    /* Ensure proper sizing for tables */
+    .table-responsive {
+        width: 100%;
+        margin-bottom: 1rem;
+        overflow-x: auto;
+    }
+    
+    /* Ensure images don't overflow */
+    .img-fluid {
+        max-width: 100%;
+        height: auto;
+    }
+</style>
+{% endblock %}
