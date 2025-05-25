@@ -20,7 +20,9 @@
             <h2>Classification Rates</h2>
         </div>
         <div class="card-body">
-            <p class="card-text">This table shows the percentage of classified taxa at each taxonomic level. Empty values and "rank prefixes" (e.g., "g__") are counted as unclassified.</p>
+            <p class="card-text">This table shows the percentage of classified taxa at each taxonomic level. 
+            <strong>Enhanced comparison logic:</strong> Empty values, rank prefixes (e.g., "g__"), and "Incertae Sedis" variations are treated as unclassified. 
+            Underscores and spaces are normalized for comparison (e.g., "Family XI" = "Family_XI").</p>
             {{ classification_stats_html|safe }}
         </div>
     </div>
@@ -44,8 +46,13 @@
             <div class="card-body">
                 {% if level in common_diffs_html %}
                     <h3>Most Common Differences</h3>
-                    <p class="card-text">This table shows the most common disagreements between the two taxonomic methods at this level.</p>
-                    {{ common_diffs_html[level]|safe }}
+                    <p class="card-text">This table shows the most common disagreements between the two taxonomic methods at this level.
+                    <strong>Note:</strong> Differences account for normalized taxonomy assignments where empty classifications, 
+                    rank prefixes, "Incertae Sedis" variants, and spacing differences are handled intelligently.
+                    Example feature IDs are provided for each type of disagreement.</p>
+                    <div class="table-responsive">
+                        {{ common_diffs_html[level]|safe }}
+                    </div>
                 {% endif %}
                 
                 {% if "confusion_" + level + ".png" in viz_files %}
@@ -74,6 +81,23 @@
     .img-fluid {
         max-width: 100%;
         height: auto;
+    }
+    
+    /* Style for feature ID examples */
+    .table td:last-child {
+        font-family: monospace;
+        font-size: 0.9em;
+        word-break: break-all;
+    }
+    
+    /* Better table styling */
+    .table {
+        font-size: 0.95em;
+    }
+    
+    .table th {
+        background-color: #f8f9fa;
+        border-top: none;
     }
 </style>
 {% endblock %}

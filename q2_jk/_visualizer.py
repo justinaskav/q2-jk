@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import qiime2
 import q2templates
-from ._methods import compare_taxonomies, get_taxonomic_levels
+from ._methods import compare_taxonomies, get_taxonomic_levels, normalize_taxonomy_assignment
 import re
 
 
@@ -45,21 +45,14 @@ def calculate_classification_rate(taxonomy_df, col_name='Taxon', truncate_prefix
     level_names = tax_levels.columns
     
     for level in level_names:
-        # Count non-empty values (classified)
-        classified = tax_levels[level].str.strip().astype(bool).sum()
+        # Use the new normalization function to determine classification status
+        normalized_assignments = tax_levels[level].apply(normalize_taxonomy_assignment)
+        classified = (normalized_assignments != "").sum()
         unclassified = total_features - classified
         pct_classified = (classified / total_features) * 100 if total_features > 0 else 0
         
-        # Count unique taxa at this level (excluding empty strings)
-        unique_taxa = tax_levels[level].replace('', np.nan).dropna().nunique()
-        
-        # Check for patterns like "g__" or "s__" that indicate empty classifications
-        if truncate_prefixes:
-            prefix_pattern = r'^[gkpcofsd]__$'
-            empty_prefix = tax_levels[level].str.match(prefix_pattern).sum()
-            classified -= empty_prefix
-            unclassified += empty_prefix
-            pct_classified = (classified / total_features) * 100 if total_features > 0 else 0
+        # Count unique taxa at this level (excluding normalized empty assignments)
+        unique_taxa = normalized_assignments[normalized_assignments != ""].nunique()
         
         classification_stats.append([
             level, classified, unclassified, pct_classified, unique_taxa

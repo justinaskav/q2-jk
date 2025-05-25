@@ -11,6 +11,59 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import re
+
+
+def normalize_taxonomy_assignment(assignment):
+    """Normalize a taxonomy assignment for comparison.
+    
+    This function handles:
+    - Empty strings, NA, None values
+    - Rank prefixes like 'g__', 's__', etc.
+    - Incertae Sedis variations
+    - Underscore/space normalization
+    
+    Parameters
+    ----------
+    assignment : str
+        Raw taxonomy assignment
+        
+    Returns
+    -------
+    str
+        Normalized assignment or empty string if unclassified
+    """
+    if pd.isna(assignment) or assignment is None:
+        return ""
+    
+    assignment = str(assignment).strip()
+    
+    # Handle empty strings
+    if not assignment:
+        return ""
+    
+    # Handle rank prefixes only (e.g., "g__", "s__")
+    if re.match(r'^[a-z]__$', assignment):
+        return ""
+    
+    # Remove rank prefixes for comparison
+    if re.match(r'^[a-z]__', assignment):
+        assignment = assignment[3:]
+    
+    # Handle Incertae Sedis variations (case insensitive)
+    incertae_pattern = r'^incertae[\s_]*sedis$'
+    if re.match(incertae_pattern, assignment, re.IGNORECASE):
+        return ""
+    
+    # Normalize underscores and spaces
+    assignment = re.sub(r'[_\s]+', ' ', assignment).strip()
+    
+    # If after all normalization we have an empty string, return empty
+    if not assignment:
+        return ""
+    
+    return assignment.lower()  # Convert to lowercase for comparison
+
 
 def parse_taxonomy_string(tax_string):
     """Parse a taxonomy string into a list of taxonomic levels."""
@@ -92,8 +145,12 @@ def compare_taxonomies(tax1_df: pd.DataFrame, tax2_df: pd.DataFrame, tax1_name="
     
     # Detailed differences for each level
     for level in level_names:
-        # Compare assignments at this level
-        same_mask = tax1_levels[level] == tax2_levels[level]
+        # Normalize assignments for comparison
+        tax1_normalized = tax1_levels[level].apply(normalize_taxonomy_assignment)
+        tax2_normalized = tax2_levels[level].apply(normalize_taxonomy_assignment)
+        
+        # Compare normalized assignments at this level
+        same_mask = tax1_normalized == tax2_normalized
         diff_mask = ~same_mask
         
         # Count matches and differences
@@ -111,29 +168,68 @@ def compare_taxonomies(tax1_df: pd.DataFrame, tax2_df: pd.DataFrame, tax1_name="
                 'FeatureID': tax1_df.loc[diff_mask].index,
                 'Tax1_Assignment': tax1_levels.loc[diff_mask, level],
                 'Tax2_Assignment': tax2_levels.loc[diff_mask, level],
+                'Tax1_Normalized': tax1_normalized.loc[diff_mask],
+                'Tax2_Normalized': tax2_normalized.loc[diff_mask],
                 'Full_Tax1': tax1_df.loc[diff_mask, 'Taxon'],
                 'Full_Tax2': tax2_df.loc[diff_mask, 'Taxon']
             })
             
-            # Create confusion matrix for this level
-            unique_vals1 = set(tax1_levels[level])
-            unique_vals2 = set(tax2_levels[level])
+            # Create confusion matrix for this level using original (non-normalized) values for display
+            # but only include truly different assignments
+            unique_vals1 = set(tax1_levels.loc[diff_mask, level])
+            unique_vals2 = set(tax2_levels.loc[diff_mask, level])
             all_vals = sorted(list(unique_vals1.union(unique_vals2)))
             
             # Create confusion matrix
             conf_matrix = pd.DataFrame(0, index=all_vals, columns=all_vals)
-            for i, val1 in enumerate(tax1_levels[level]):
-                val2 = tax2_levels[level].iloc[i]
-                conf_matrix.loc[val1, val2] += 1
+            for idx in diff_mask[diff_mask].index:
+                val1 = tax1_levels.loc[idx, level]
+                val2 = tax2_levels.loc[idx, level]
+                if val1 in all_vals and val2 in all_vals:
+                    conf_matrix.loc[val1, val2] += 1
+            
+            # Add diagonal elements for matching assignments
+            for idx in same_mask[same_mask].index:
+                val1 = tax1_levels.loc[idx, level]
+                if val1 not in all_vals:
+                    all_vals.append(val1)
+                    # Expand confusion matrix
+                    conf_matrix = conf_matrix.reindex(index=all_vals, columns=all_vals, fill_value=0)
+                conf_matrix.loc[val1, val1] += 1
                 
             confusion_matrices[level] = conf_matrix
             
             # Find most common mismatches (differences between taxonomies)
+            # Group by normalized assignment pairs to get counts and examples
+            mismatch_groups = {}
+            for idx in diff_mask[diff_mask].index:
+                original1 = tax1_levels.loc[idx, level]
+                original2 = tax2_levels.loc[idx, level]
+                normalized1 = tax1_normalized.loc[idx]
+                normalized2 = tax2_normalized.loc[idx]
+                
+                # Use original values for display
+                key = (original1, original2)
+                if key not in mismatch_groups:
+                    mismatch_groups[key] = {
+                        'count': 0,
+                        'examples': [],
+                        'normalized1': normalized1,
+                        'normalized2': normalized2
+                    }
+                mismatch_groups[key]['count'] += 1
+                # Store up to 3 examples per mismatch type
+                if len(mismatch_groups[key]['examples']) < 3:
+                    mismatch_groups[key]['examples'].append(idx)
+            
+            # Convert to list and sort by count
             mismatches = []
-            for i, row in conf_matrix.iterrows():
-                for j, val in row.items():
-                    if i != j and val > 0:  # Skip the diagonal (matching assignments)
-                        mismatches.append((i, j, val, (val / n_total) * 100))
+            for (orig1, orig2), data in mismatch_groups.items():
+                mismatches.append((
+                    orig1, orig2, data['count'], 
+                    (data['count'] / n_total) * 100,
+                    '; '.join(data['examples'])  # Join example feature IDs
+                ))
             
             # Sort by count (descending)
             mismatches.sort(key=lambda x: x[2], reverse=True)
@@ -144,7 +240,7 @@ def compare_taxonomies(tax1_df: pd.DataFrame, tax2_df: pd.DataFrame, tax1_name="
                 common_diff_df = pd.DataFrame(
                     mismatches[:top_n], 
                     columns=[f'{tax1_name} Assignment', f'{tax2_name} Assignment', 
-                            'Count', 'Percent of Features']
+                            'Count', 'Percent of Features', 'Example Feature IDs']
                 )
                 common_diff_df['Percent of Features'] = common_diff_df['Percent of Features'].round(2)
                 common_differences[level] = common_diff_df
