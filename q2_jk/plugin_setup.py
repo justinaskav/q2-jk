@@ -6,8 +6,7 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-from qiime2.plugin import Citations, Plugin, Str
-from qiime2 import Artifact
+from qiime2.plugin import Citations, Plugin, Str, Metadata
 from q2_types.feature_data import FeatureData, Taxonomy
 from q2_types.feature_table import FeatureTable, Frequency
 from q2_jk import __version__
@@ -53,20 +52,24 @@ plugin.visualizers.register_function(
     citations=[]
 )
 
-# Register the unified gram staining analysis visualizer with optional feature table
+# Register the unified gram staining analysis visualizer with optional feature table and metadata
 plugin.visualizers.register_function(
     function=visualize_gram_staining,
     inputs={
         'taxonomy': FeatureData[Taxonomy],
         'feature_table': FeatureTable[Frequency]
     },
-    parameters={},
+    parameters={
+        'metadata': Metadata
+    },
     input_descriptions={
         'taxonomy': 'Taxonomy table to analyze for gram staining composition.',
-        'feature_table': 'Optional feature abundance table. When provided, adds abundance-weighted analysis alongside feature count analysis.'
+        'feature_table': 'Optional feature abundance table. When provided, adds abundance-weighted analysis, sample variation analysis, and extraction bias detection alongside feature count analysis.'
     },
-    parameter_descriptions={},
-    name='Analyze gram staining composition',
-    description='Analyzes taxonomy data to determine gram positive/negative bacterial composition using hierarchical taxonomic classification. Always shows feature count analysis. Optionally provide --i-feature-table for additional abundance-weighted analysis.',
+    parameter_descriptions={
+        'metadata': 'Optional sample metadata table. When provided, enables group-based comparisons and statistical analysis of microbiome ratios between sample categories.'
+    },
+    name='Analyze gram staining composition with advanced diagnostics',
+    description='Comprehensive analysis of gram positive/negative bacterial composition using hierarchical taxonomic classification. Includes feature count analysis, optional abundance-weighted analysis, phylum-level ratio calculations (F/B ratios), DNA extraction bias detection, and metadata-based group comparisons.',
     citations=[]
 )

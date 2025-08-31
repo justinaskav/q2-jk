@@ -15,6 +15,11 @@ import qiime2
 import q2templates
 from ._methods import (compare_taxonomies, get_taxonomic_levels, normalize_taxonomy_assignment,
                        analyze_gram_staining, analyze_comprehensive_taxonomic_levels)
+from ._sample_analysis import (calculate_abundance_weighted_summary, calculate_sample_wise_feature_counts,
+                              calculate_sample_wise_abundance, calculate_feature_abundance_discrepancy)
+from ._ratios import calculate_all_ratios
+from ._metadata import analyze_metadata_groups
+from ._bias_detection import assess_all_extraction_bias
 import re
 
 
@@ -281,9 +286,9 @@ def visualize_taxonomy_comparison(output_dir: str,
     q2templates.render(index_fp, output_dir, context=context)
 
 
-def visualize_gram_staining(output_dir: str, taxonomy: pd.DataFrame, feature_table: pd.DataFrame = None) -> None:
+def visualize_gram_staining(output_dir: str, taxonomy: pd.DataFrame, feature_table: pd.DataFrame = None, metadata: pd.DataFrame = None) -> None:
     """
-    Generate a visualization analyzing gram staining composition of taxonomy data.
+    Generate a comprehensive visualization analyzing gram staining composition with advanced diagnostics.
     
     Parameters
     ----------
@@ -292,9 +297,11 @@ def visualize_gram_staining(output_dir: str, taxonomy: pd.DataFrame, feature_tab
     taxonomy : pd.DataFrame
         Taxonomy DataFrame with feature data
     feature_table : pd.DataFrame, optional
-        Feature abundance table for abundance-weighted analysis
+        Feature abundance table for abundance-weighted analysis and bias detection
+    metadata : pd.DataFrame, optional
+        Sample metadata for group-based comparisons and statistical analysis
     """
-    _visualize_gram_staining_impl(output_dir, taxonomy, feature_table)
+    _visualize_gram_staining_impl(output_dir, taxonomy, feature_table, metadata)
 
 
 
@@ -770,9 +777,11 @@ def generate_classification_examples():
     return examples
 
 
-def _visualize_gram_staining_impl(output_dir: str, taxonomy: pd.DataFrame, feature_table: pd.DataFrame = None) -> None:
+def _visualize_gram_staining_impl(output_dir: str, taxonomy: pd.DataFrame, 
+                                feature_table: pd.DataFrame = None, 
+                                metadata: pd.DataFrame = None) -> None:
     """
-    Internal implementation for gram staining visualization.
+    Internal implementation for gram staining visualization with comprehensive analysis.
     
     Parameters
     ----------
@@ -782,6 +791,8 @@ def _visualize_gram_staining_impl(output_dir: str, taxonomy: pd.DataFrame, featu
         Taxonomy DataFrame with feature data
     feature_table : pd.DataFrame, optional
         Feature abundance table for abundance-weighted analysis
+    metadata : pd.DataFrame, optional
+        Sample metadata for group-based comparisons
     """
     # Perform gram staining analysis
     (summary_stats, detailed_classification, level_breakdown, unique_taxa_summary, 
@@ -793,20 +804,47 @@ def _visualize_gram_staining_impl(output_dir: str, taxonomy: pd.DataFrame, featu
     # Generate classification examples for user understanding
     classification_examples = generate_classification_examples()
     
-    # Calculate abundance-weighted and sample-wise analysis if feature_table provided
+    # Initialize enhanced analysis variables
     abundance_summary_stats = None
     abundance_comprehensive_analysis = None
     sample_wise_stats = None
     sample_wise_abundance = None
     discrepancy_analysis = None
+    fb_ratios = None
+    extraction_ratios = None
+    bias_assessment = None
+    metadata_analysis = None
+    
+    # Enhanced analysis if feature_table provided
     if feature_table is not None:
         # QIIME2 feature tables come transposed (samples x features), we need (features x samples)
         feature_table_transposed = feature_table.T
+        
+        # Basic abundance analysis
+        from ._sample_analysis import calculate_abundance_weighted_summary, calculate_sample_wise_feature_counts, calculate_sample_wise_abundance, calculate_feature_abundance_discrepancy
         abundance_summary_stats = calculate_abundance_weighted_summary(detailed_classification, feature_table_transposed)
         abundance_comprehensive_analysis = analyze_comprehensive_taxonomic_levels(taxonomy, feature_table_transposed)
         sample_wise_stats = calculate_sample_wise_feature_counts(detailed_classification, feature_table_transposed)
         sample_wise_abundance = calculate_sample_wise_abundance(detailed_classification, feature_table_transposed)
         discrepancy_analysis = calculate_feature_abundance_discrepancy(sample_wise_stats, sample_wise_abundance)
+        
+        # Phylum-level ratio calculations
+        from ._ratios import calculate_sample_wise_fb_ratios, calculate_extraction_efficiency_ratios
+        fb_ratios = calculate_sample_wise_fb_ratios(detailed_classification, feature_table_transposed)
+        extraction_ratios = calculate_extraction_efficiency_ratios(detailed_classification, feature_table_transposed)
+        
+        # DNA extraction bias assessment
+        from ._bias_detection import assess_all_extraction_bias
+        bias_assessment = assess_all_extraction_bias(
+            sample_discrepancy=discrepancy_analysis,
+            fb_ratios=fb_ratios,
+            extraction_ratios=extraction_ratios
+        )
+    
+    # Metadata analysis if provided
+    if metadata is not None:
+        from ._metadata import analyze_metadata_groups
+        metadata_analysis = analyze_metadata_groups(metadata, fb_ratios, sample_wise_stats)
     
     # Create summary visualization
     plt.style.use('seaborn-v0_8')
@@ -1064,6 +1102,35 @@ def _visualize_gram_staining_impl(output_dir: str, taxonomy: pd.DataFrame, featu
         sample_summary_file = os.path.join(output_dir, "sample_summary.tsv")
         sample_summary.to_csv(sample_summary_file, sep='\t', index=False)
     
+    # Save F/B ratio analysis if available
+    if fb_ratios is not None and not fb_ratios.empty:
+        fb_ratios_file = os.path.join(output_dir, "fb_ratios.tsv")
+        fb_ratios.to_csv(fb_ratios_file, sep='\t', index=False)
+    
+    # Save extraction efficiency ratios if available
+    if extraction_ratios is not None and not extraction_ratios.empty:
+        extraction_ratios_file = os.path.join(output_dir, "extraction_ratios.tsv")
+        extraction_ratios.to_csv(extraction_ratios_file, sep='\t', index=False)
+    
+    # Save bias assessment results if available
+    if bias_assessment is not None:
+        if not bias_assessment['fb_ratio_bias'].empty:
+            fb_bias_file = os.path.join(output_dir, "fb_ratio_bias_assessment.tsv")
+            bias_assessment['fb_ratio_bias'].to_csv(fb_bias_file, sep='\t', index=False)
+        
+        if not bias_assessment['missing_taxa_assessment'].empty:
+            missing_taxa_file = os.path.join(output_dir, "missing_taxa_assessment.tsv")
+            bias_assessment['missing_taxa_assessment'].to_csv(missing_taxa_file, sep='\t', index=False)
+        
+        if not bias_assessment['sample_warnings'].empty:
+            sample_warnings_file = os.path.join(output_dir, "sample_warnings.tsv")
+            bias_assessment['sample_warnings'].to_csv(sample_warnings_file, sep='\t', index=False)
+    
+    # Save metadata analysis if available  
+    if metadata_analysis is not None and metadata_analysis.get('group_comparisons') is not None:
+        group_comparisons_file = os.path.join(output_dir, "group_comparisons.tsv")
+        metadata_analysis['group_comparisons'].to_csv(group_comparisons_file, sep='\t', index=False)
+    
     # Generate classification statistics for backwards compatibility
     classification_stats = detailed_classification.groupby(['ClassificationLevel', 'GramStatus']).size().unstack(fill_value=0)
     classification_stats_file = os.path.join(output_dir, "classification_level_stats.tsv")
@@ -1154,8 +1221,70 @@ def _visualize_gram_staining_impl(output_dir: str, taxonomy: pd.DataFrame, featu
         }).reset_index()
         sample_summary_html = sample_summary.to_html(classes=["table", "table-striped", "table-hover"], index=False)
     
+    # F/B ratio analysis HTML
+    fb_ratios_html = None
+    if fb_ratios is not None and not fb_ratios.empty:
+        fb_ratios_html = fb_ratios.to_html(classes=["table", "table-striped", "table-hover"], index=False)
+    
+    # Extraction efficiency ratios HTML
+    extraction_ratios_html = None
+    if extraction_ratios is not None and not extraction_ratios.empty:
+        extraction_ratios_html = extraction_ratios.to_html(classes=["table", "table-striped", "table-hover"], index=False)
+    
+    # Bias assessment HTML
+    bias_assessment_html = {}
+    systematic_bias_html = None
+    if bias_assessment is not None:
+        if not bias_assessment['fb_ratio_bias'].empty:
+            bias_assessment_html['fb_ratio_bias'] = bias_assessment['fb_ratio_bias'].to_html(classes=["table", "table-striped", "table-hover"], index=False)
+        if not bias_assessment['missing_taxa_assessment'].empty:
+            bias_assessment_html['missing_taxa'] = bias_assessment['missing_taxa_assessment'].to_html(classes=["table", "table-striped", "table-hover"], index=False)
+        if not bias_assessment['sample_warnings'].empty:
+            bias_assessment_html['sample_warnings'] = bias_assessment['sample_warnings'].to_html(classes=["table", "table-striped", "table-hover"], index=False)
+        
+        # Systematic bias assessment summary
+        if bias_assessment.get('systematic_bias_assessment'):
+            systematic_bias_summary = bias_assessment['systematic_bias_assessment']
+            if systematic_bias_summary:
+                # Create a summary DataFrame for display
+                summary_data = []
+                if 'dataset_bias_summary' in systematic_bias_summary:
+                    for analysis_type, data in systematic_bias_summary['dataset_bias_summary'].items():
+                        summary_data.append({
+                            'Analysis Type': analysis_type.replace('_', ' ').title(),
+                            'Details': str(data)
+                        })
+                if 'extraction_quality_flags' in systematic_bias_summary:
+                    for flag in systematic_bias_summary['extraction_quality_flags']:
+                        summary_data.append({
+                            'Analysis Type': 'Quality Flag',
+                            'Details': flag
+                        })
+                if summary_data:
+                    systematic_df = pd.DataFrame(summary_data)
+                    systematic_bias_html = systematic_df.to_html(classes=["table", "table-striped", "table-hover"], index=False)
+    
+    # Metadata analysis HTML
+    metadata_summary_html = None
+    group_comparisons_html = None
+    if metadata_analysis is not None:
+        # Metadata summary
+        if metadata_analysis.get('metadata_summary'):
+            metadata_summary = metadata_analysis['metadata_summary']
+            summary_data = []
+            summary_data.append({'Property': 'Total Metadata Samples', 'Value': metadata_summary.get('total_metadata_samples', 0)})
+            summary_data.append({'Property': 'Common Samples', 'Value': metadata_summary.get('common_samples', 0)})
+            summary_data.append({'Property': 'Overlap Percentage', 'Value': f"{metadata_summary.get('overlap_percentage', 0)}%"})
+            summary_data.append({'Property': 'Suitable Group Columns', 'Value': ', '.join(metadata_summary.get('suitable_group_columns', []))})
+            metadata_summary_df = pd.DataFrame(summary_data)
+            metadata_summary_html = metadata_summary_df.to_html(classes=["table", "table-striped", "table-hover"], index=False)
+        
+        # Group comparisons
+        if metadata_analysis.get('group_comparisons') is not None:
+            group_comparisons_html = metadata_analysis['group_comparisons'].to_html(classes=["table", "table-striped", "table-hover"], index=False)
+    
     context = {
-        'title': 'Gram Staining Analysis',
+        'title': 'Comprehensive Gram Staining Analysis with Advanced Diagnostics',
         'total_features': len(detailed_classification),
         'summary_stats': summary_stats,
         'summary_html': summary_html,
@@ -1187,7 +1316,24 @@ def _visualize_gram_staining_impl(output_dir: str, taxonomy: pd.DataFrame, featu
         'abundance_comprehensive_analysis': abundance_comprehensive_analysis,
         'sample_wise_stats': sample_wise_stats,
         'sample_wise_abundance': sample_wise_abundance,
-        'discrepancy_analysis': discrepancy_analysis
+        'discrepancy_analysis': discrepancy_analysis,
+        # Enhanced analysis features
+        'fb_ratios': fb_ratios,
+        'fb_ratios_html': fb_ratios_html,
+        'extraction_ratios': extraction_ratios,
+        'extraction_ratios_html': extraction_ratios_html,
+        'bias_assessment': bias_assessment,
+        'bias_assessment_html': bias_assessment_html,
+        'systematic_bias_html': systematic_bias_html,
+        'metadata_analysis': metadata_analysis,
+        'metadata_summary_html': metadata_summary_html,
+        'group_comparisons_html': group_comparisons_html,
+        # Feature flags for template
+        'has_ratio_analysis': fb_ratios is not None and not fb_ratios.empty,
+        'has_bias_assessment': bias_assessment is not None,
+        'has_metadata_analysis': metadata_analysis is not None,
+        'has_systematic_bias': systematic_bias_html is not None,
+        'has_group_comparisons': group_comparisons_html is not None
     }
     
     # Create HTML report

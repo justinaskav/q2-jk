@@ -108,10 +108,10 @@ def get_taxonomic_levels(taxonomy_df, col_name='Taxon'):
 GRAM_POSITIVE_PHYLA = {
     # Modern names (GTDB)
     'bacillota': 'positive',           # Modern name for Firmicutes
-    'actinomycetota': 'positive',      # Modern name for Actinobacteria
+    'actinomycetota': 'positive',      # Modern name (replaces legacy Actinobacteria)
     # Legacy names (Silva/Greengenes)
     'firmicutes': 'positive',
-    'actinobacteria': 'positive',
+    'actinobacteria': 'positive',      # Legacy name for Actinomycetota
     'tenericutes': 'variable',         # Mycoplasma - no cell wall
     'mycoplasmatota': 'variable',      # Modern name for Tenericutes
 }
@@ -153,7 +153,7 @@ GRAM_STATUS_GENUS = {
     'ureaplasma': 'variable',
     'spiroplasma': 'variable',
     
-    # Actinobacteria - mostly positive
+    # Actinomycetota (formerly Actinobacteria) - mostly positive
     'mycobacterium': 'variable',  # Acid-fast, weakly gram-positive
     'nocardia': 'variable',       # Acid-fast, weakly gram-positive
     'streptomyces': 'positive',

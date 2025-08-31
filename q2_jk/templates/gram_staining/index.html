@@ -4,8 +4,18 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <h1 class="display-4">Gram Staining Analysis Report</h1>
-            <p class="lead">Comprehensive analysis of bacterial gram staining composition based on hierarchical taxonomic classification</p>
+            <h1 class="display-4">{{ title }}</h1>
+            <p class="lead">Comprehensive analysis of bacterial gram staining composition with advanced diagnostics including F/B ratio calculations, DNA extraction bias detection, and metadata-based group comparisons</p>
+            {% if is_abundance_weighted %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> <strong>Enhanced Analysis:</strong> This report includes abundance-weighted analysis, sample variation assessment, and extraction bias detection.
+            </div>
+            {% endif %}
+            {% if has_metadata_analysis %}
+            <div class="alert alert-info">
+                <i class="fas fa-users"></i> <strong>Metadata Integration:</strong> Group-based comparisons and statistical analysis included based on provided sample metadata.
+            </div>
+            {% endif %}
         </div>
     </div>
     
@@ -300,6 +310,173 @@
                     <li>Use mock communities to validate extraction efficiency</li>
                 </ul>
             </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- F/B Ratio Analysis (when feature table provided) -->
+    {% if has_ratio_analysis %}
+    <div class="card mt-4">
+        <div class="card-header bg-primary text-white">
+            <h2><i class="fas fa-balance-scale"></i> Firmicutes/Bacteroidetes (F/B) Ratio Analysis</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-primary mb-3">
+                <h6><i class="fas fa-microscope"></i> <strong>Clinical Microbiome Ratios</strong></h6>
+                <p class="mb-1">F/B ratios are important indicators in gut microbiome research. Low ratios may indicate gram-positive bacterial loss due to extraction issues or dysbiosis.</p>
+                <small><strong>Clinical significance:</strong> F/B < 0.2 suggests possible gram-positive underrepresentation; F/B > 10 may indicate gram-positive dominance.</small>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="table-responsive">
+                        {{ fb_ratios_html|safe }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3 border-primary">
+                <div class="card-header bg-light text-dark">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> F/B Ratio Interpretation</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0 small">
+                        <li><strong>F/B < 0.2:</strong> Low gram-positive abundance - may suggest extraction bias or dysbiosis</li>
+                        <li><strong>F/B 0.2-10:</strong> Normal range - balanced microbiome composition</li>
+                        <li><strong>F/B > 10:</strong> High gram-positive abundance - possible dominance or gram-negative loss</li>
+                        <li><strong>Infinite ratio:</strong> Bacteroidetes absent - possible technical issue</li>
+                        <li><strong>Zero ratio:</strong> Bacillota absent - may indicate extraction problems</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Extraction Efficiency Ratios (when feature table provided) -->
+    {% if extraction_ratios_html %}
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h2><i class="fas fa-flask"></i> Extraction Efficiency Analysis</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info mb-3">
+                <h6><i class="fas fa-dna"></i> <strong>Phylum-Level Extraction Assessment</strong></h6>
+                <p class="mb-1">This analysis examines the abundance of key phyla that serve as indicators of extraction efficiency, particularly for gram-positive bacteria.</p>
+                <small><strong>Technical significance:</strong> Actinomycetota absence or low abundance may indicate inadequate cell wall lysis.</small>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="table-responsive">
+                        {{ extraction_ratios_html|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- DNA Extraction Bias Assessment (when available) -->
+    {% if has_bias_assessment %}
+    <div class="card mt-4">
+        <div class="card-header bg-warning text-dark">
+            <h2><i class="fas fa-exclamation-triangle"></i> Systematic Extraction Bias Assessment</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning mb-3">
+                <h6><i class="fas fa-microscope"></i> <strong>Automated Quality Control</strong></h6>
+                <p class="mb-1">This analysis automatically detects patterns suggestive of DNA extraction bias across your dataset using multiple indicators.</p>
+                <small><strong>Technical significance:</strong> Consistent patterns across samples may indicate protocol optimization needs.</small>
+            </div>
+            
+            <!-- F/B Ratio Bias Assessment -->
+            {% if 'fb_ratio_bias' in bias_assessment_html %}
+            <h5><i class="fas fa-chart-line"></i> F/B Ratio Bias Patterns</h5>
+            <div class="table-responsive">
+                {{ bias_assessment_html.fb_ratio_bias|safe }}
+            </div>
+            {% endif %}
+            
+            <!-- Missing Taxa Assessment -->
+            {% if 'missing_taxa' in bias_assessment_html %}
+            <h5 class="mt-4"><i class="fas fa-search-minus"></i> Missing Key Taxa Assessment</h5>
+            <div class="table-responsive">
+                {{ bias_assessment_html.missing_taxa|safe }}
+            </div>
+            {% endif %}
+            
+            <!-- Sample-wise Warning Summary -->
+            {% if 'sample_warnings' in bias_assessment_html %}
+            <h5 class="mt-4"><i class="fas fa-flag"></i> Sample Quality Warnings</h5>
+            <div class="table-responsive">
+                {{ bias_assessment_html.sample_warnings|safe }}
+            </div>
+            {% endif %}
+            
+            <!-- Systematic Bias Summary -->
+            {% if has_systematic_bias %}
+            <div class="card mt-4 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Dataset-Wide Bias Assessment</h5>
+                </div>
+                <div class="card-body">
+                    {{ systematic_bias_html|safe }}
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="alert alert-info mt-4">
+                <h6><i class="fas fa-lightbulb"></i> <strong>Interpretation Guidelines</strong></h6>
+                <ul class="mb-0 small">
+                    <li><strong>High bias samples:</strong> Consider re-extraction with enhanced lysis protocols</li>
+                    <li><strong>Missing Actinomycetota:</strong> Strong indicator of gram-positive extraction issues</li>
+                    <li><strong>Consistent patterns:</strong> Suggest systematic protocol issues rather than biological variation</li>
+                    <li><strong>Validation approach:</strong> Use qPCR targeting specific gram-positive taxa for confirmation</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Metadata-Based Group Analysis (when metadata provided) -->
+    {% if has_metadata_analysis %}
+    <div class="card mt-4">
+        <div class="card-header bg-success text-white">
+            <h2><i class="fas fa-users"></i> Metadata-Based Group Comparisons</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-success mb-3">
+                <h6><i class="fas fa-chart-bar"></i> <strong>Sample Group Analysis</strong></h6>
+                <p class="mb-1">This analysis compares microbiome ratios between different sample groups based on your provided metadata.</p>
+                <small><strong>Statistical significance:</strong> Group differences may indicate biological associations or technical batch effects.</small>
+            </div>
+            
+            <!-- Metadata Summary -->
+            {% if metadata_summary_html %}
+            <h5><i class="fas fa-info-circle"></i> Metadata Summary</h5>
+            <div class="table-responsive">
+                {{ metadata_summary_html|safe }}
+            </div>
+            {% endif %}
+            
+            <!-- Group Comparisons -->
+            {% if has_group_comparisons %}
+            <h5 class="mt-4"><i class="fas fa-balance-scale"></i> Group Comparison Statistics</h5>
+            <div class="table-responsive">
+                {{ group_comparisons_html|safe }}
+            </div>
+            
+            <div class="alert alert-success mt-3">
+                <h6><i class="fas fa-chart-line"></i> <strong>Statistical Interpretation</strong></h6>
+                <ul class="mb-0 small">
+                    <li><strong>Mean/Median:</strong> Central tendency for each group</li>
+                    <li><strong>Standard deviation:</strong> Measure of variability within groups</li>
+                    <li><strong>Min/Max:</strong> Range of values in each group</li>
+                    <li><strong>Large differences:</strong> May indicate group-specific microbiome patterns</li>
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -708,6 +885,71 @@
                 <div class="col-md-4 mb-2">
                     <a href="sample_summary.tsv" class="btn btn-warning btn-sm btn-block" download>
                         <i class="fas fa-vial"></i> Sample Summary
+                    </a>
+                </div>
+                {% endif %}
+                
+                <!-- Sample Analysis Files -->
+                {% if sample_wise_stats is not none %}
+                <div class="col-md-4 mb-2">
+                    <a href="sample_wise_feature_counts.tsv" class="btn btn-info btn-sm btn-block" download>
+                        <i class="fas fa-hashtag"></i> Sample Feature Counts
+                    </a>
+                </div>
+                {% endif %}
+                {% if sample_wise_abundance is not none %}
+                <div class="col-md-4 mb-2">
+                    <a href="sample_wise_abundance.tsv" class="btn btn-info btn-sm btn-block" download>
+                        <i class="fas fa-balance-scale"></i> Sample Abundance
+                    </a>
+                </div>
+                {% endif %}
+                {% if discrepancy_analysis is not none %}
+                <div class="col-md-4 mb-2">
+                    <a href="feature_abundance_discrepancy.tsv" class="btn btn-danger btn-sm btn-block" download>
+                        <i class="fas fa-exclamation-triangle"></i> Extraction Bias
+                    </a>
+                </div>
+                {% endif %}
+                
+                <!-- Ratio Analysis Files -->
+                {% if has_ratio_analysis %}
+                <div class="col-md-4 mb-2">
+                    <a href="fb_ratios.tsv" class="btn btn-primary btn-sm btn-block" download>
+                        <i class="fas fa-balance-scale"></i> F/B Ratios
+                    </a>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <a href="extraction_ratios.tsv" class="btn btn-primary btn-sm btn-block" download>
+                        <i class="fas fa-flask"></i> Extraction Ratios
+                    </a>
+                </div>
+                {% endif %}
+                
+                <!-- Bias Assessment Files -->
+                {% if has_bias_assessment %}
+                <div class="col-md-4 mb-2">
+                    <a href="fb_ratio_bias_assessment.tsv" class="btn btn-warning btn-sm btn-block" download>
+                        <i class="fas fa-chart-line"></i> F/B Bias Assessment
+                    </a>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <a href="missing_taxa_assessment.tsv" class="btn btn-warning btn-sm btn-block" download>
+                        <i class="fas fa-search-minus"></i> Missing Taxa
+                    </a>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <a href="sample_warnings.tsv" class="btn btn-warning btn-sm btn-block" download>
+                        <i class="fas fa-flag"></i> Sample Warnings
+                    </a>
+                </div>
+                {% endif %}
+                
+                <!-- Metadata Analysis Files -->
+                {% if has_group_comparisons %}
+                <div class="col-md-4 mb-2">
+                    <a href="group_comparisons.tsv" class="btn btn-success btn-sm btn-block" download>
+                        <i class="fas fa-users"></i> Group Comparisons
                     </a>
                 </div>
                 {% endif %}
