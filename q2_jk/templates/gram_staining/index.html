@@ -1,0 +1,803 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4">Gram Staining Analysis Report</h1>
+            <p class="lead">Comprehensive analysis of bacterial gram staining composition based on hierarchical taxonomic classification</p>
+        </div>
+    </div>
+    
+    <!-- Summary Statistics -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-bar"></i> Overall Summary</h2>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    {{ summary_html|safe }}
+                </div>
+                <div class="col-md-4">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> Gram Staining Categories</h6>
+                        <ul class="list-unstyled">
+                            <li><span class="badge badge-success">Gram Positive</span> Thick peptidoglycan layer</li>
+                            <li><span class="badge badge-danger">Gram Negative</span> Thin peptidoglycan layer</li>
+                            <li><span class="badge badge-warning">Variable/Unknown</span> Inconsistent or atypical</li>
+                            <li><span class="badge badge-secondary">Non-Bacterial</span> Archaea, Eukaryotes</li>
+                            <li><span class="badge badge-dark">Unclassified</span> Insufficient taxonomy</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Analysis Summary Alert -->
+    <div class="alert alert-primary" role="alert">
+        <h5 class="alert-heading"><i class="fas fa-info-circle"></i> How This Analysis Works</h5>
+        <p class="mb-2">This analysis uses <strong>hierarchical taxonomic classification</strong> to predict gram staining status:</p>
+        <ul class="mb-2">
+            <li><strong>Step 1:</strong> Identify bacterial vs non-bacterial features</li>
+            <li><strong>Step 2:</strong> Search our database: genus → family → phylum levels</li>
+            <li><strong>Step 3:</strong> Assign confidence scores based on classification level</li>
+        </ul>
+        <p class="mb-0"><strong>Database includes both modern (GTDB) and legacy taxonomic names for maximum compatibility.</strong></p>
+    </div>
+
+    <!-- Overview Visualization -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-pie"></i> Gram Staining Overview</h2>
+        </div>
+        <div class="card-body text-center">
+            <img src="gram_staining_overview.png" alt="Gram Staining Distribution Overview" class="img-fluid" style="max-width: 100%; height: auto;">
+            <p class="mt-3 text-muted"><strong>Feature count</strong> distribution of gram staining status across all analyzed features, 
+            showing both overall composition (pie chart) and breakdown by taxonomic classification level (bar chart).</p>
+        </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-hashtag"></i> Feature Count Summary Statistics</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info mb-3">
+                <h6><i class="fas fa-hashtag"></i> <strong>Feature Count Analysis</strong></h6>
+                <p class="mb-1">These statistics show the <strong>number of features</strong> (ASVs/OTUs) in each gram category, 
+                treating each feature equally regardless of its abundance.</p>
+                {% if not is_abundance_weighted %}
+                    <small><strong>Note:</strong> Use <code>visualize-gram-staining-with-table</code> with <code>--i-table</code> for additional abundance-weighted analysis.</small>
+                {% endif %}
+            </div>
+            <p class="card-text">Feature counts and percentages for each gram staining category:</p>
+            <div class="row">
+                <div class="col-lg-8">
+                    {{ summary_html|safe }}
+                    
+                </div>
+                <div class="col-lg-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title">Classification Categories</h6>
+                            <ul class="list-unstyled">
+                                <li><span class="badge" style="background-color: #2E7D32; color: white;">Gram Positive</span> - Bacteria with thick peptidoglycan layer</li>
+                                <li><span class="badge" style="background-color: #C62828; color: white;">Gram Negative</span> - Bacteria with thin peptidoglycan layer</li>
+                                <li><span class="badge" style="background-color: #FF8F00; color: white;">Variable/Unknown</span> - Inconsistent staining or atypical cell walls</li>
+                                <li><span class="badge" style="background-color: #6A1B9A; color: white;">Non-Bacterial</span> - Archaea, Eukaryotes, or other domains</li>
+                                <li><span class="badge" style="background-color: #757575; color: white;">Unclassified</span> - Insufficient taxonomic information</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Abundance-Weighted Analysis (when table provided) -->
+    {% if is_abundance_weighted %}
+    <div class="card mt-4">
+        <div class="card-header bg-success text-white">
+            <h2><i class="fas fa-weight"></i> Abundance-Weighted Summary Statistics</h2>
+        </div>
+        <div class="card-body">
+            {% if abundance_summary_stats is not none %}
+            <div class="alert alert-success mb-3">
+                <h6><i class="fas fa-weight"></i> <strong>Abundance-Weighted Analysis</strong></h6>
+                <p class="mb-1">These statistics reflect the <strong>total abundance</strong> (read counts) of each gram category across all samples, 
+                not just feature presence/absence. A gram-positive ASV with 10,000 reads has more impact than a gram-negative ASV with 10 reads.</p>
+                <small><strong>Biological significance:</strong> Results reflect actual bacterial load and community composition.</small>
+            </div>
+            <p class="card-text">Abundance-weighted counts and percentages for each gram staining category:</p>
+            
+            <div class="row">
+                <div class="col-lg-12">
+                    {{ abundance_summary_stats.to_html(classes=["table", "table-striped", "table-hover"])|safe }}
+                </div>
+            </div>
+            
+            <div class="card mt-3 border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0"><i class="fas fa-balance-scale"></i> Key Insight: Abundance vs Feature Count Comparison</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small mb-0">Compare the abundance-weighted percentages above with the feature count percentages in the previous section. 
+                    <strong>Large differences indicate that high-abundance and low-abundance features have different gram profiles.</strong> 
+                    For example, if feature counts show 50% gram positive but abundance shows 70% gram positive, 
+                    it means gram-positive ASVs tend to be more abundant in your samples.</p>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-exclamation-triangle"></i> <strong>Feature ID Mismatch Issue</strong></h6>
+                <p class="mb-1">Cannot calculate abundance-weighted statistics because <strong>no matching feature IDs</strong> were found between your taxonomy file and feature table.</p>
+                <small><strong>Common causes:</strong> Feature IDs have different formats (e.g., taxonomy uses ASV_1, table uses feature1) or the files come from different processing pipelines.</small>
+                <hr>
+                <p class="mb-0 small"><strong>Solution:</strong> Ensure both files contain the same feature identifiers. In QIIME2, this usually happens when both files are derived from the same initial feature table.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Abundance-Weighted Visualizations -->
+    {% if abundance_summary_stats is not none %}
+    <div class="card mt-4">
+        <div class="card-header bg-success text-white">
+            <h2><i class="fas fa-chart-pie"></i> Abundance-Weighted Gram Staining Overview</h2>
+        </div>
+        <div class="card-body text-center">
+            <img src="abundance_weighted_overview.png" alt="Abundance-Weighted Gram Staining Distribution" class="img-fluid" style="max-width: 100%; height: auto;">
+            <p class="mt-3 text-muted"><strong>Abundance-weighted</strong> distribution of gram staining status, 
+            showing both overall composition (pie chart) and breakdown by taxonomic classification level (bar chart). 
+            Charts reflect total read abundance, not feature counts.</p>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- Sample-wise Feature Count Variation (when feature table provided) -->
+    {% if sample_wise_stats is not none %}
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h2><i class="fas fa-vials"></i> Sample-wise Feature Count Variation</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info mb-3">
+                <h6><i class="fas fa-chart-bar"></i> <strong>Per-Sample Analysis</strong></h6>
+                <p class="mb-1">This analysis shows <strong>feature diversity</strong> across samples. Each row shows how many gram-positive/negative features are <strong>present</strong> in each sample (presence/absence, not abundance).</p>
+                <small><strong>Biological significance:</strong> Reveals sample-specific microbial community composition and diversity patterns.</small>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="table-responsive">
+                        {{ sample_wise_stats.to_html(classes=["table", "table-striped", "table-hover", "table-sm"], index=False, table_id="sample-variation-table")|safe }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3 border-info">
+                <div class="card-header bg-light text-dark">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> How to Interpret This Table</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0 small">
+                        <li><strong>TotalFeatures:</strong> Number of unique ASVs/features detected in this sample</li>
+                        <li><strong>Count columns:</strong> Raw feature counts per gram category in this sample</li>
+                        <li><strong>Pct columns:</strong> Percentage of features in this sample belonging to each category</li>
+                        <li><strong>High variation between samples</strong> indicates different microbial community structures</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Abundance-weighted Sample Variation (when feature table provided) -->
+    {% if sample_wise_abundance is not none %}
+    <div class="card mt-4">
+        <div class="card-header bg-warning text-dark">
+            <h2><i class="fas fa-balance-scale"></i> Sample-wise Abundance Variation</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning mb-3">
+                <h6><i class="fas fa-chart-area"></i> <strong>Per-Sample Abundance Analysis</strong></h6>
+                <p class="mb-1">This analysis shows <strong>biomass/read abundance</strong> across samples. Each row shows the total <strong>read counts</strong> for each gram category per sample, reflecting actual bacterial load.</p>
+                <small><strong>Biological significance:</strong> Reveals which gram categories dominate each sample by biomass, not just diversity.</small>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="table-responsive">
+                        {{ sample_wise_abundance.to_html(classes=["table", "table-striped", "table-hover", "table-sm"], index=False, table_id="sample-abundance-table")|safe }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3 border-warning">
+                <div class="card-header bg-light text-dark">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> Abundance vs Feature Count Comparison</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small mb-2">Compare this abundance table with the feature count table above to identify:</p>
+                    <ul class="mb-0 small">
+                        <li><strong>TotalAbundance:</strong> Total read counts in this sample (sequencing depth)</li>
+                        <li><strong>Abundance columns:</strong> Raw read counts per gram category</li>
+                        <li><strong>AbundancePct columns:</strong> Percentage of reads belonging to each category</li>
+                        <li><strong>Dominance patterns:</strong> High abundance % with low feature count = few species dominate</li>
+                        <li><strong>Diversity patterns:</strong> Similar abundance and feature % = even community structure</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Feature vs Abundance Discrepancy Analysis (when feature table provided) -->
+    {% if discrepancy_analysis is not none %}
+    <div class="card mt-4">
+        <div class="card-header bg-danger text-white">
+            <h2><i class="fas fa-exclamation-triangle"></i> DNA Extraction Bias Analysis</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-danger mb-3">
+                <h6><i class="fas fa-dna"></i> <strong>Technical Quality Control</strong></h6>
+                <p class="mb-1">This analysis compares <strong>feature diversity vs abundance patterns</strong> to identify potential DNA extraction bias. Large discrepancies may indicate incomplete lysis of gram-positive bacteria.</p>
+                <small><strong>Technical significance:</strong> Negative discrepancy scores suggest gram-positive underrepresentation due to extraction inefficiency.</small>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="table-responsive">
+                        {{ discrepancy_analysis.to_html(classes=["table", "table-striped", "table-hover", "table-sm"], index=False, table_id="discrepancy-analysis-table")|safe }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="card border-danger">
+                        <div class="card-header bg-light text-dark">
+                            <h6 class="mb-0"><i class="fas fa-search"></i> How to Interpret Discrepancy Scores</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="mb-0 small">
+                                <li><strong>Positive scores:</strong> Abundance % > Feature % (category overrepresented)</li>
+                                <li><strong>Negative scores:</strong> Abundance % < Feature % (category underrepresented)</li>
+                                <li><strong>Extraction Bias Score:</strong> Gram-positive discrepancy (negative = extraction issues)</li>
+                                <li><strong>High Bias Likelihood:</strong> Score < -15% suggests technical problems</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-warning">
+                        <div class="card-header bg-light text-dark">
+                            <h6 class="mb-0"><i class="fas fa-flask"></i> Extraction Bias Patterns</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="mb-0 small">
+                                <li><strong>"Gram+ Underrepresented":</strong> Likely incomplete lysis</li>
+                                <li><strong>"Balanced":</strong> Good extraction efficiency</li>
+                                <li><strong>"Gram+ Overrepresented":</strong> Possible gram-negative degradation</li>
+                                <li><strong>Consistent patterns:</strong> Protocol issue vs biological variation</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <h6><i class="fas fa-lightbulb"></i> <strong>Recommendations</strong></h6>
+                <p class="mb-1"><strong>If High/Moderate bias detected:</strong></p>
+                <ul class="mb-0 small">
+                    <li>Validate with qPCR targeting gram-positive taxa (e.g., Firmicutes)</li>
+                    <li>Consider re-extraction with enhanced lysis (longer lysozyme, bead-beating)</li>
+                    <li>Check if patterns correlate with sample types vs random distribution</li>
+                    <li>Use mock communities to validate extraction efficiency</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Classification Level Statistics -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-sitemap"></i> Classification Method Statistics</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text">This table shows which taxonomic level was used to determine gram status for each category. 
+            Higher resolution (genus-level) classifications are more reliable than broader (phylum-level) predictions.</p>
+            {{ class_stats_html|safe }}
+        </div>
+    </div>
+
+    <!-- Confidence Statistics -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-line"></i> Classification Confidence</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text"><strong>Why do phylum-level classifications show more uncertain results?</strong></p>
+            <div class="alert alert-info">
+                <ul class="mb-0">
+                    <li><strong>Genus-level (0.9 confidence):</strong> Direct matches in our database - highest reliability</li>
+                    <li><strong>Family-level (0.7 confidence):</strong> Good patterns, but broader than genus-specific</li> 
+                    <li><strong>Phylum-level (0.5 confidence):</strong> Very broad patterns - many exceptions exist within phyla</li>
+                    <li><strong>Fallback classifications:</strong> When no specific genus/family match is found, we use phylum-level patterns, which are less reliable</li>
+                </ul>
+            </div>
+            {{ confidence_html|safe }}
+        </div>
+    </div>
+
+    <!-- Classification Pipeline Statistics -->
+    {% if pipeline_html %}
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h2 class="mb-0"><i class="fas fa-sitemap"></i> Classification Pipeline</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text">Step-by-step breakdown of how features were processed through our classification pipeline:</p>
+            {{ pipeline_html|safe }}
+            <div class="alert alert-info mt-3">
+                <strong>Why do we lose features at each step?</strong>
+                <ul class="mb-0 mt-2">
+                    <li><strong>Step 1:</strong> Non-bacterial organisms (Archaea, Eukaryotes) don't have gram staining</li>
+                    <li><strong>Step 2:</strong> Features without sufficient taxonomic classification can't be matched</li>
+                    <li><strong>Step 3:</strong> Some bacterial taxa aren't in our database or have variable gram status</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Database Coverage Analysis -->
+    {% if has_database_coverage %}
+    <div class="card mt-4">
+        <div class="card-header bg-success text-white">
+            <h2 class="mb-0"><i class="fas fa-database"></i> Database Coverage Report</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text">How well does our gram staining database cover the taxa in your dataset?</p>
+            {{ database_coverage_html|safe }}
+            <div class="alert alert-success mt-3">
+                <strong>Database Coverage Explanation:</strong>
+                <ul class="mb-0 mt-2">
+                    <li><strong>Higher coverage = more reliable predictions</strong></li>
+                    <li>Genus-level coverage is most important for accuracy</li>
+                    <li>Family and phylum coverage provide backup classification</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Comprehensive Taxonomic Level Analysis -->
+    <div class="card mt-4">
+        <div class="card-header bg-success text-white">
+            <h2 class="mb-0"><i class="fas fa-layer-group"></i> 
+                {% if is_abundance_weighted %}
+                    Abundance-Weighted Taxonomic Level Analysis
+                {% else %}
+                    Feature Count Taxonomic Level Analysis
+                {% endif %}
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info mb-4">
+                <h5><i class="fas fa-info-circle"></i> What does this analysis show?</h5>
+                <p><strong>This section shows how ALL {{ total_features }} features would be classified at each taxonomic resolution level.</strong></p>
+                <ul>
+                    <li><strong>Kingdom Level:</strong> Domain classification only - shows "Bacterial" vs "Non-Bacterial" vs "Unclassified" (no gram staining predictions yet)</li>
+                    <li><strong>Phylum Level:</strong> First level where gram staining predictions begin - features with phylum info get gram classifications</li>
+                    <li><strong>Genus Level:</strong> Most accurate gram predictions - features with genus information get high-confidence predictions</li>
+                </ul>
+                <div class="alert alert-info mt-2 mb-0">
+                    <small><strong>Important:</strong> Kingdom level shows domain classification (bacteria vs non-bacteria) with 100% confidence since this is straightforward taxonomy parsing. Gram staining predictions only begin at Phylum level and deeper, with confidence scores reflecting the biological accuracy of the predictions.</small>
+                </div>
+                <div class="alert alert-secondary mt-2 mb-0">
+                    <small><strong>Note:</strong> Both kingdom ("k__Bacteria") and domain ("d__Bacteria") prefixes are supported and treated equivalently.</small>
+                </div>
+                <p><strong>Key insight:</strong> As you go deeper taxonomically, features without sufficient resolution at that level become "unclassified". 
+                A feature with "k__Bacteria; p__Firmicutes; g__" would show as "Bacterial" at Kingdom level, "Gram Positive" at Phylum level, but "Unclassified" at Genus level.</p>
+                <div class="alert alert-warning mt-2 mb-0">
+                    <small><strong>Example:</strong> If 1000 features have phylum info but only 800 have genus info, then Genus-level analysis shows 
+                    800 classified + 200 unclassified, while Phylum-level shows 1000 classified.</small>
+                </div>
+            </div>
+            
+            <!-- Tab Navigation for Comprehensive Analysis -->
+            <ul class="nav nav-tabs" id="comprehensiveTabs" role="tablist">
+                {% for level in comprehensive_analysis_levels %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if loop.first %}active{% endif %}" 
+                            id="comprehensive-{{ level|lower }}-tab" 
+                            data-toggle="tab" 
+                            data-target="#comprehensive-{{ level|lower }}" 
+                            type="button" 
+                            role="tab" 
+                            aria-controls="comprehensive-{{ level|lower }}" 
+                            aria-selected="{% if loop.first %}true{% else %}false{% endif %}">
+                        <strong>{{ level }} Level</strong>
+                        <br><small class="text-muted">All {{ total_features }} features</small>
+                    </button>
+                </li>
+                {% endfor %}
+            </ul>
+            
+            <!-- Tab Content for Comprehensive Analysis -->
+            <div class="tab-content" id="comprehensiveTabsContent">
+                {% for level in comprehensive_analysis_levels %}
+                <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                     id="comprehensive-{{ level|lower }}" 
+                     role="tabpanel" 
+                     aria-labelledby="comprehensive-{{ level|lower }}-tab">
+                    <div class="mt-3">
+                        {% if level in comprehensive_analysis_html %}
+                            {{ comprehensive_analysis_html[level]|safe }}
+                        {% else %}
+                            <p class="text-muted">No analysis available for {{ level.lower() }} level.</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="alert alert-warning mt-3">
+                <strong><i class="fas fa-chart-bar"></i> Chart Correspondence:</strong>
+                The <strong>bar chart above</strong> shows this comprehensive analysis - each bar represents how all features 
+                are classified when examined at that specific taxonomic level. The <strong>pie chart</strong> shows the final 
+                classification using the deepest available taxonomy for each feature.
+            </div>
+        </div>
+    </div>
+
+    <!-- Classification Examples -->
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h2 class="mb-0"><i class="fas fa-lightbulb"></i> Classification Examples</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info mb-4">
+                <h5><i class="fas fa-graduation-cap"></i> Understanding Classification Logic</h5>
+                <p>Here are concrete examples showing how different taxonomic situations are handled by our classification algorithm. 
+                These examples help explain why certain features end up in different gram staining categories.</p>
+            </div>
+            
+            <div class="row">
+                {% for example in classification_examples %}
+                <div class="col-lg-6 mb-4">
+                    <div class="card border-{{ example.color_class }}">
+                        <div class="card-header bg-{{ example.color_class }} text-white">
+                            <strong><i class="fas fa-microscope"></i> {{ example.scenario }}</strong>
+                        </div>
+                        <div class="card-body">
+                            <h6><strong>Taxonomy String:</strong></h6>
+                            <code class="small">{{ example.taxonomy_string }}</code>
+                            
+                            <div class="row mt-3">
+                                <div class="col-sm-6">
+                                    <strong>Classification:</strong><br>
+                                    <span class="badge badge-{{ example.color_class }}">{{ example.classification }}</span>
+                                </div>
+                                <div class="col-sm-6">
+                                    <strong>Level Used:</strong><br>
+                                    <span class="badge badge-secondary">{{ example.level_used }}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-2">
+                                <strong>Confidence:</strong>
+                                <span class="badge badge-light">{{ example.confidence }}</span>
+                            </div>
+                            
+                            <div class="alert alert-light mt-3 mb-0">
+                                <small><strong>Explanation:</strong> {{ example.explanation }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="alert alert-success mt-4">
+                <h6><strong><i class="fas fa-key"></i> Key Takeaways:</strong></h6>
+                <ul class="mb-0">
+                    <li><strong>Hierarchical Classification:</strong> Algorithm tries genus → family → phylum levels for gram staining</li>
+                    <li><strong>Kingdom = Domain:</strong> Kingdom level only does domain classification (bacteria vs non-bacteria), no gram predictions</li>
+                    <li><strong>Confidence Levels:</strong> Kingdom=100% (domain parsing), Genus=90%, Family=70%, Phylum=50%</li>
+                    <li><strong>Normalization:</strong> Terms like "Incertae Sedis", "Unknown", empty values are treated as missing data</li>
+                    <li><strong>Fallback Logic:</strong> If a level has no database match, falls back to broader taxonomic levels</li>
+                    <li><strong>Modern Names:</strong> Database includes both GTDB (Bacillota) and legacy (Firmicutes) taxonomic names</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Classification Source Analysis -->
+    <div class="card mt-4">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0"><i class="fas fa-search"></i> Classification Source Breakdown</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text"><strong>Which taxonomic level was actually used to classify each feature?</strong> 
+            This shows whether final classifications came from specific genus matches, family patterns, or broad phylum rules.</p>
+            
+            <div class="row">
+                {% for level in classification_source_levels %}
+                <div class="col-md-6 mb-3">
+                    <div class="card border-primary">
+                        <div class="card-header">
+                            <strong>{{ level }} Level Classifications</strong>
+                        </div>
+                        <div class="card-body">
+                            {% if level in classification_source_html %}
+                                {{ classification_source_html[level]|safe }}
+                            {% else %}
+                                <p class="text-muted">No features classified using {{ level.lower() }}-level matches.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="alert alert-warning mt-3">
+                <strong>Confidence Levels:</strong>
+                <span class="badge badge-success">Genus: 90%</span>
+                <span class="badge badge-warning">Family: 70%</span>
+                <span class="badge badge-danger">Phylum: 50%</span>
+                <span class="badge badge-secondary">Kingdom: 20%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unique Taxa Summary -->
+    {% if unique_taxa_html %}
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-list-alt"></i> Unique Taxa Classification Summary</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text">Summary of unique taxa found in your dataset and their gram staining predictions. 
+            This shows how many unique ASVs/features were assigned to each taxon and their gram status.</p>
+            
+            <!-- Tab Navigation -->
+            <ul class="nav nav-tabs" id="taxaTabs" role="tablist">
+                {% for level in unique_taxa_levels %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if loop.first %}active{% endif %}" 
+                            id="taxa-{{ level|lower }}-tab" 
+                            data-toggle="tab" 
+                            data-target="#taxa-{{ level|lower }}" 
+                            type="button" 
+                            role="tab" 
+                            aria-controls="taxa-{{ level|lower }}" 
+                            aria-selected="{% if loop.first %}true{% else %}false{% endif %}">
+                        <strong>{{ level }} Level</strong>
+                    </button>
+                </li>
+                {% endfor %}
+            </ul>
+            
+            <!-- Tab Content -->
+            <div class="tab-content" id="taxaTabsContent">
+                {% for level in unique_taxa_levels %}
+                <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                     id="taxa-{{ level|lower }}" 
+                     role="tabpanel" 
+                     aria-labelledby="taxa-{{ level|lower }}-tab">
+                    <div class="mt-3">
+                        {% if level in unique_taxa_html %}
+                            {{ unique_taxa_html[level]|safe }}
+                        {% else %}
+                            <p class="text-muted">No unique taxa classified at this level.</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Abundance-Weighted Analysis -->
+    {% if has_abundance_data %}
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-weight"></i> Abundance-Weighted Gram Composition</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text"><strong>Important:</strong> This analysis shows gram staining composition weighted by actual sequence abundances in your samples. 
+            This can differ significantly from feature-count analysis above, as some taxa may be much more abundant than others.</p>
+            
+            <h5>Per-Sample Gram Composition (% Relative Abundance)</h5>
+            {{ abundance_html|safe }}
+            
+            {% if sample_summary_html %}
+            <h5 class="mt-4">Sample Sequencing Depth</h5>
+            {{ sample_summary_html|safe }}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Detailed Classification Sample -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-microscope"></i> Detailed Classification Results</h2>
+        </div>
+        <div class="card-body">
+            {% if has_detailed_sample %}
+            <div class="alert alert-warning" role="alert">
+                <strong>Note:</strong> Showing first 100 features. Download the complete detailed_classification.tsv file for all results.
+            </div>
+            {% endif %}
+            <p class="card-text">Individual feature classifications showing the taxonomic basis for gram staining predictions:</p>
+            <div class="table-responsive">
+                {{ detailed_html|safe }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Download Section -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-download"></i> Download Data</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text">Download the complete analysis results in TSV format:</p>
+            <div class="row">
+                <!-- Core Files -->
+                <div class="col-md-4 mb-2">
+                    <a href="gram_summary.tsv" class="btn btn-primary btn-sm btn-block" download>
+                        <i class="fas fa-chart-bar"></i> Summary Statistics
+                    </a>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <a href="detailed_classification.tsv" class="btn btn-primary btn-sm btn-block" download>
+                        <i class="fas fa-list"></i> Detailed Classification
+                    </a>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <a href="confidence_statistics.tsv" class="btn btn-success btn-sm btn-block" download>
+                        <i class="fas fa-chart-line"></i> Confidence Stats
+                    </a>
+                </div>
+                
+                <!-- Analysis Files -->
+                <div class="col-md-4 mb-2">
+                    <a href="classification_pipeline_stats.tsv" class="btn btn-info btn-sm btn-block" download>
+                        <i class="fas fa-sitemap"></i> Pipeline Stats
+                    </a>
+                </div>
+                {% if has_database_coverage %}
+                <div class="col-md-4 mb-2">
+                    <a href="database_coverage_report.tsv" class="btn btn-success btn-sm btn-block" download>
+                        <i class="fas fa-database"></i> Coverage Report
+                    </a>
+                </div>
+                {% endif %}
+                <div class="col-md-4 mb-2">
+                    <a href="classification_source_breakdown.tsv" class="btn btn-warning btn-sm btn-block" download>
+                        <i class="fas fa-search"></i> Source Breakdown
+                    </a>
+                </div>
+                
+                <!-- Taxa Files -->
+                {% for level in unique_taxa_levels %}
+                <div class="col-md-4 mb-2">
+                    <a href="unique_taxa_{{ level.lower() }}.tsv" class="btn btn-secondary btn-sm btn-block" download>
+                        <i class="fas fa-list-alt"></i> {{ level }} Taxa
+                    </a>
+                </div>
+                {% endfor %}
+                
+                <!-- Abundance Files -->
+                {% if has_abundance_data %}
+                <div class="col-md-4 mb-2">
+                    <a href="abundance_weighted_stats.tsv" class="btn btn-warning btn-sm btn-block" download>
+                        <i class="fas fa-weight"></i> Abundance Stats
+                    </a>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <a href="sample_summary.tsv" class="btn btn-warning btn-sm btn-block" download>
+                        <i class="fas fa-vial"></i> Sample Summary
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Methodology -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2><i class="fas fa-info-circle"></i> Methodology</h2>
+        </div>
+        <div class="card-body">
+            <h5>Classification Approach</h5>
+            <p>This analysis uses a hierarchical approach to predict gram staining status:</p>
+            <ol>
+                <li><strong>Taxonomic Normalization:</strong> Taxonomy strings are normalized to handle rank prefixes (e.g., "g__"), empty values, and "Incertae Sedis" variants</li>
+                <li><strong>Hierarchical Lookup:</strong> For each feature, the system searches for gram staining information in this order:
+                    <ul>
+                        <li>Genus level (most specific)</li>
+                        <li>Family level</li>
+                        <li>Phylum level (most general)</li>
+                    </ul>
+                </li>
+                <li><strong>Database Coverage:</strong> The classification database includes:
+                    <ul>
+                        <li>Major bacterial phyla patterns (e.g., Firmicutes → mostly positive, Proteobacteria → negative)</li>
+                        <li>Family-level classifications for improved resolution</li>
+                        <li>Genus-level exceptions and well-known classifications</li>
+                        <li>Special cases (e.g., Mycoplasma with no cell wall → variable)</li>
+                    </ul>
+                </li>
+            </ol>
+            
+            <h5>Interpretation Guidelines</h5>
+            <ul>
+                <li><strong>High Confidence:</strong> Genus and family-level classifications</li>
+                <li><strong>Moderate Confidence:</strong> Phylum-level classifications</li>
+                <li><strong>Variable/Unknown:</strong> Taxa with inconsistent or atypical gram staining (e.g., Mycobacterium, Mycoplasma)</li>
+                <li><strong>Limitations:</strong> Predictions are based on typical patterns and may not account for strain-level variations</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    .table-responsive {
+        width: 100%;
+        margin-bottom: 1rem;
+        overflow-x: auto;
+    }
+    
+    .img-fluid {
+        max-width: 100%;
+        height: auto;
+    }
+    
+    .table {
+        font-size: 0.9em;
+    }
+    
+    .table th {
+        background-color: #f8f9fa;
+        border-top: none;
+    }
+    
+    .btn-block {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .badge {
+        font-size: 0.85em;
+        margin-right: 0.25rem;
+        margin-bottom: 0.25rem;
+        display: inline-block;
+    }
+    
+    .accordion-button {
+        font-weight: 600;
+    }
+    
+    .card-header h2 {
+        margin-bottom: 0;
+        font-size: 1.5rem;
+    }
+    
+    .card-header i {
+        margin-right: 0.5rem;
+        color: #007bff;
+    }
+</style>
+{% endblock %}

@@ -7,11 +7,12 @@
 # ----------------------------------------------------------------------------
 
 from qiime2.plugin import Citations, Plugin, Str
+from qiime2 import Artifact
 from q2_types.feature_data import FeatureData, Taxonomy
-from q2_types.feature_table import Frequency
+from q2_types.feature_table import FeatureTable, Frequency
 from q2_jk import __version__
 from q2_jk._methods import compare_taxonomies
-from q2_jk._visualizer import visualize_taxonomy_comparison
+from q2_jk._visualizer import visualize_taxonomy_comparison, visualize_gram_staining
 
 citations = Citations.load("citations.bib", package="q2_jk")
 
@@ -49,5 +50,23 @@ plugin.visualizers.register_function(
     },
     name='Compare taxonomy classifications',
     description='Compares two taxonomy classifications and visualizes the differences.',
+    citations=[]
+)
+
+# Register the unified gram staining analysis visualizer with optional feature table
+plugin.visualizers.register_function(
+    function=visualize_gram_staining,
+    inputs={
+        'taxonomy': FeatureData[Taxonomy],
+        'feature_table': FeatureTable[Frequency]
+    },
+    parameters={},
+    input_descriptions={
+        'taxonomy': 'Taxonomy table to analyze for gram staining composition.',
+        'feature_table': 'Optional feature abundance table. When provided, adds abundance-weighted analysis alongside feature count analysis.'
+    },
+    parameter_descriptions={},
+    name='Analyze gram staining composition',
+    description='Analyzes taxonomy data to determine gram positive/negative bacterial composition using hierarchical taxonomic classification. Always shows feature count analysis. Optionally provide --i-feature-table for additional abundance-weighted analysis.',
     citations=[]
 )

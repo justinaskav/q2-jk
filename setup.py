@@ -31,7 +31,7 @@ setup(
             ".plugin_setup:plugin"]
     },
     package_data={
-        "q2_jk": ["citations.bib", "templates/*"],
+        "q2_jk": ["citations.bib", "templates/*", "templates/gram_staining/*"],
         "q2_jk.tests": ["data/*"],
     },
     zip_safe=False,
